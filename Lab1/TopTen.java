@@ -45,7 +45,7 @@ public class TopTen {
     public static class TopTenMapper extends Mapper<Object, Text, NullWritable, Text> {
         
         // Stores a map of user reputation to the record
-        private TreeMap<Integer, String> repToRecordMap = new TreeMap<>();
+        private TreeMap<Integer, Text> repToRecordMap = new TreeMap<Integer, Text>();
         Integer printCount = 0;
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
@@ -55,7 +55,7 @@ public class TopTen {
             String reputation = parsed.get(REP);
             
             if (userId != null)
-                repToRecordMap.put(Integer.parseInt(reputation), value.toString());
+                repToRecordMap.put(Integer.parseInt(reputation), new Text(value));
 
             if (repToRecordMap.size() > 10) {
                 repToRecordMap.remove(repToRecordMap.firstKey());
@@ -64,8 +64,8 @@ public class TopTen {
 
         protected void cleanup(Context context) throws IOException, InterruptedException {
             // Output our ten records to the reducers with a null key
-            for (String s : repToRecordMap.values()) {
-                context.write(NullWritable.get(), new Text(s));
+            for (Text t: repToRecordMap.values()) {
+                context.write(NullWritable.get(), new Text(t));
             }
         }
     }
@@ -73,12 +73,12 @@ public class TopTen {
     public static class TopTenReducer extends Reducer<NullWritable, Text, NullWritable, Text> {
         // Stores a map of user reputation to the record
         // Overloads the comparator to order the reputations in descending order
-        private TreeMap<Integer, String> repToRecordMap = new TreeMap<>();
+        private TreeMap<Integer, Text> repToRecordMap = new TreeMap<Integer, Text>();
 
         public void reduce(NullWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
             for (Text value : values) {
                 Map<String, String> parsed = transformXmlToMap(value.toString());
-                repToRecordMap.put(Integer.parseInt(parsed.get(REP)), value.toString());
+                repToRecordMap.put(Integer.parseInt(parsed.get(REP)), new Text(value));
                 
                 // If we have more than ten records, remove the one with the lowest reputation
                 if (repToRecordMap.size() > 10) {
@@ -87,9 +87,9 @@ public class TopTen {
             }
 			
 			// Sort in descending order
-            for (String s : repToRecordMap.descendingMap().values()) {
+            for (Text t : repToRecordMap.descendingMap().values()) {
                 // Output our ten records to the file system with a null key
-                context.write(NullWritable.get(), new Text(s));
+                context.write(NullWritable.get(), new Text(t));
             }
         }
     }
